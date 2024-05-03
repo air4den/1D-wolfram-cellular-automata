@@ -4,26 +4,27 @@ using namespace std;
 #include <SFML/Graphics.hpp>
 
 const unsigned int WINDOW_WIDTH = 1600;
-const unsigned int WINDOW_HEIGHT = 1000;
+const unsigned int WINDOW_HEIGHT = 800;
 const unsigned int CELL_SIZE = 10;
 const unsigned int GRID_WIDTH = WINDOW_WIDTH / CELL_SIZE;
 const unsigned int GRID_HEIGHT = WINDOW_HEIGHT / CELL_SIZE;
 
+// change this value to [0, 256)
 const unsigned int RULE_NUMBER = 110;
 
+const unsigned int TIME_BETWEEN_STATE = 10;     // time between states (milliseconds)
 
-// TODO: refactor cell into class
-// TODO: refactor into header files
-// TODO: add color
-// TODO: add rule # to binary array converter helper method
-// TODO: optimize use of clearRow()
-// simplify Makefile
+sf::Color colors[2] = {
+    sf::Color::White,       // state is 0
+    sf::Color::Black,       // state is 1
+};
 
 void setRuleArray(unsigned int * rule) {
     int dec = RULE_NUMBER;
-    int  index = 0;
+    int index = 0;
     while (dec != 0 && index < 8) {
-        rule[index] = dec % 2;
+        int currRule = dec % 2;
+        rule[index] = currRule;
         dec /= 2;
         index++;
     }
@@ -44,11 +45,7 @@ void clearCellGrid(unsigned int cells[][GRID_WIDTH]) {
 void drawCell(sf::RenderWindow &window, unsigned int x, unsigned int y, int state) {
     sf::RectangleShape cell(sf::Vector2f(CELL_SIZE, CELL_SIZE));
     cell.setPosition(x, y);
-    if (!state) {
-        cell.setFillColor(sf::Color::Black);
-    } else {
-        cell.setFillColor(sf::Color::White);
-    }
+    cell.setFillColor(colors[state]);
     window.draw(cell);
 }
 
@@ -74,13 +71,14 @@ void drawGridLines(sf::RenderWindow& window) {
 void drawCellGrid(sf::RenderWindow& window, unsigned int cells[][GRID_WIDTH]) {
     for (int i = 0; i < GRID_HEIGHT; i++) {
         for (int j = 0; j < GRID_WIDTH; j++) {
-            drawCell(window, j * CELL_SIZE, i * CELL_SIZE, cells[i][j]);
+            drawCell(window, j * CELL_SIZE, i * CELL_SIZE, cells[i][j]);    
         }
     }
 }
 
-void computeNextState(unsigned int * currCellRow, unsigned int * prevCellRow, int counter, unsigned int * rule) {
+void computeNextState(unsigned int * currCellRow, unsigned int * prevCellRow, unsigned int cells[][GRID_WIDTH], int counter, unsigned int * rule) {
     if (counter == 0) {
+        clearCellGrid(cells);
         clearRow(currCellRow);
         currCellRow[GRID_WIDTH/2] = 1;
     } else {
@@ -92,7 +90,6 @@ void computeNextState(unsigned int * currCellRow, unsigned int * prevCellRow, in
             int derivedRule = (prevCellRow[leftPrevIndex] << 2) + (prevCellRow[centerPrevIndex] << 1) + prevCellRow[rightPrevIndex];
             int nextState = rule[derivedRule];
             currCellRow[i] = nextState;
-
         }
     }
 }
@@ -117,6 +114,7 @@ void updateCellsGrid(unsigned int * currCellRow, unsigned int cells[][GRID_WIDTH
 int main() {
     sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Wolfram 1-D Cellular Automata");
 
+    // initialize current Row, previous Row, overall grid
     unsigned int cells[GRID_HEIGHT][GRID_WIDTH];
     unsigned int currCellRow[GRID_WIDTH];
     unsigned int prevCellRow[GRID_WIDTH];
@@ -127,6 +125,7 @@ int main() {
     unsigned int rule[8];
     setRuleArray(rule);
 
+    unsigned int currHue; 
     sf::Clock clock; // start the clock
 
     // begin automata loop
@@ -135,24 +134,29 @@ int main() {
         while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed)
                 window.close();
+            if (event.type == sf::Event::KeyPressed) {
+                if (event.key.scancode == sf::Keyboard::Scan::Enter) {
+                    counter = 0;
+                }
+            }
         }
 
         window.clear();
 
         // Draw cellular automata simulation here
-        //drawGridLines(window);  // This doesn't work...fix this
 
-        //wait to update (1 step/second)
+        //wait to update
         sf::Time elapsed = clock.getElapsedTime();
-        if (elapsed > sf::milliseconds(10)) {
+        if (elapsed > sf::milliseconds(TIME_BETWEEN_STATE)) {
             // next state
-            computeNextState(currCellRow, prevCellRow, counter, rule);
+            computeNextState(currCellRow, prevCellRow, cells, counter, rule);
             updateCellsGrid(currCellRow, cells, counter);
+
             drawCellGrid(window, cells);
+            //drawGridLines(window);
+
             window.display();
 
-            //std::cout << elapsed.asSeconds() << std::endl;
-            std::cout << counter << std::endl;
             copyRow(currCellRow, prevCellRow);
             counter++;
             clock.restart();
